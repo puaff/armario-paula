@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>El armario de Paula</title><style>
-/* EL ARMARIO DE PAULA — edición visual moderna. La lógica de datos se conserva. */
+/* EL ARMARIO DE PAULA — diseño moderno, tallas unificadas sin distinguir mayúsculas. */
 :root{--bg:#f5f6f8;--ink:#17202c;--muted:#6f7887;--line:#e5e9ef;--accent:#365df5;--white:#fff;--shadow:0 14px 36px rgba(25,40,66,.065)}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -92,6 +92,33 @@ const notify=s=>{$('#message').textContent=s||'';};
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(state));localState=structuredClone(state);return true;}catch(e){notify('No cabe toda la información en la memoria de este navegador. Exporta una copia de seguridad.');return false;}}
 const loc=id=>state.locations.find(x=>x.id===id)?.name||'Sin ubicación';
 const options=(selected)=>state.locations.map(x=>`<option value="${esc(x.id)}" ${x.id===selected?'selected':''}>${esc(x.name)}</option>`).join('');
+// Las tallas se comparan sin diferenciar mayúsculas y minúsculas.
+// No se modifican automáticamente las fichas antiguas de Firestore.
+const sizeKey=value=>String(value??'').trim().replace(/\s+/g,' ').toLocaleLowerCase('es');
+const sizeDisplay=value=>{
+ const v=String(value??'').trim().replace(/\s+/g,' ');
+ // Estandarizar las tallas alfabéticas habituales, también las combinadas.
+ if(/^(?:[a-z]{1,4})(?:\s*\/\s*[a-z]{1,4})*$/i.test(v))return v.toLocaleUpperCase('es').replace(/\s*\/\s*/g,'/');
+ return v;
+};
+const sizeOptions=()=>{
+ const uniques=new Map();
+ for(const item of state.items){
+  const original=String(item.size??'').trim();
+  if(!original)continue;
+  const key=sizeKey(original);
+  if(!uniques.has(key))uniques.set(key,sizeDisplay(original));
+ }
+ const order=['xxxs','xxs','xs','xs/s','s','s/m','m','m/l','l','l/xl','xl','xxl','xxxl'];
+ return [...uniques.entries()].sort(([ak,av],[bk,bv])=>{
+  const ar=order.indexOf(ak),br=order.indexOf(bk);
+  if(ar!==-1||br!==-1)return (ar===-1?Infinity:ar)-(br===-1?Infinity:br);
+  const an=/^\d/.test(av),bn=/^\d/.test(bv);
+  if(an!==bn)return an?-1:1;
+  return av.localeCompare(bv,'es',{numeric:true,sensitivity:'base'});
+ }).map(([key,label])=>`<option value="${esc(key)}">Talla ${esc(label)}</option>`).join('');
+};
+
 function view(t){tab=t;editing=null;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));render();}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>view(b.dataset.tab));
 function userRules(uid){return `rules_version = '2';
@@ -157,8 +184,8 @@ $('#sync').onclick=async()=>{
 function render(){
  let a=$('#app');
  if(tab==='coleccion'){
- let items=state.items.filter(x=>(filter==='all'||x.location===filter)&&(sizeFilter==='all'||(sizeFilter==='empty'?!String(x.size??'').trim():String(x.size??'').trim()===sizeFilter))&&(`${x.name} ${x.category} ${x.color} ${x.size||''} ${x.season} ${loc(x.location)}`).toLowerCase().includes(search.toLowerCase()));
- a.innerHTML=`<h2 class="intro">Mi colección</h2><p class="hint">${state.items.length} prendas registradas · Tu boutique personal ${connected?'☁️':'· Modo local'}</p><div class="tools"><input id="search" placeholder="Buscar prenda, talla, color…" value="${esc(search)}"><select id="filter"><option value="all">Todas las ubicaciones</option>${options(filter)}</select><select id="sizefilter"><option value="all">Todas las tallas</option><option value="empty">Sin talla</option>${[...new Set(state.items.map(x=>String(x.size??'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true})).map(v=>`<option value="${esc(v)}">Talla ${esc(v)}</option>`).join('')}</select></div><div class="grid">${items.map(x=>`<article class="tile"><div class="photo">${x.photo?`<img src="${esc(x.photo)}" alt="${esc(x.name)}">`:'Sin fotografía'}</div><div class="info"><h3>${esc(x.name)}${x.size?`<span class="size-pill">${esc(x.size)}</span>`:''}</h3><p>${esc(x.category)} · ${esc(loc(x.location))}</p><button data-edit="${esc(x.id)}">Ver detalles →</button></div></article>`).join('')}</div>${!items.length?'<div class="empty">Todavía no hay prendas que mostrar. Añade la primera fotografía para comenzar.</div>':''}`;
+ let items=state.items.filter(x=>(filter==='all'||x.location===filter)&&(sizeFilter==='all'||(sizeFilter==='empty'?!sizeKey(x.size):sizeKey(x.size)===sizeFilter))&&(`${x.name} ${x.category} ${x.color} ${x.size||''} ${x.season} ${loc(x.location)}`).toLowerCase().includes(search.toLowerCase()));
+ a.innerHTML=`<h2 class="intro">Mi colección</h2><p class="hint">${state.items.length} prendas registradas · Tu boutique personal ${connected?'☁️':'· Modo local'}</p><div class="tools"><input id="search" placeholder="Buscar prenda, talla, color…" value="${esc(search)}"><select id="filter"><option value="all">Todas las ubicaciones</option>${options(filter)}</select><select id="sizefilter"><option value="all">Todas las tallas</option><option value="empty">Sin talla</option>${sizeOptions()}</select></div><div class="grid">${items.map(x=>`<article class="tile"><div class="photo">${x.photo?`<img src="${esc(x.photo)}" alt="${esc(x.name)}">`:'Sin fotografía'}</div><div class="info"><h3>${esc(x.name)}${x.size?`<span class="size-pill">${esc(sizeDisplay(x.size))}</span>`:''}</h3><p>${esc(x.category)} · ${esc(loc(x.location))}</p><button data-edit="${esc(x.id)}">Ver detalles →</button></div></article>`).join('')}</div>${!items.length?'<div class="empty">Todavía no hay prendas que mostrar. Añade la primera fotografía para comenzar.</div>':''}`;
  $('#search').oninput=e=>{search=e.target.value;const p=e.target.selectionStart;render();$('#search').focus();$('#search').setSelectionRange(p,p);};
  $('#filter').value=filter;$('#filter').onchange=e=>{filter=e.target.value;render();};
  $('#sizefilter').value=sizeFilter;$('#sizefilter').onchange=e=>{sizeFilter=e.target.value;render();};
@@ -175,7 +202,7 @@ function render(){
  $('#takephoto').onclick=()=>$('#cameraInput').click();$('#choosephoto').onclick=()=>$('#photo').click();
  const handlePhoto=async e=>{const f=e.target.files[0];if(!f)return;try{photo=await shrink(f);$('#preview').innerHTML=`<img src="${photo}" style="width:100%;border-radius:8px">`;}catch(err){notify('No se pudo leer la fotografía. Prueba con una imagen JPEG o PNG.');}};
  $('#photo').onchange=handlePhoto;$('#cameraInput').onchange=handlePhoto;
- $('#itemform').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target),item={id:editing||'P'+Date.now(),photo,name:String(fd.get('name')).trim(),category:String(fd.get('category')).trim(),color:String(fd.get('color')).trim(),size:String(fd.get('size')??'').trim(),season:String(fd.get('season')),location:String(fd.get('location')),notes:String(fd.get('notes')).trim()};if(!item.name)return;$('#saveitem').disabled=true;try{if(connected&&item.photo?.startsWith('data:image/'))item.photo=await compressDataUrl(item.photo);await put('items',item);search='';filter='all';sizeFilter='all';view('coleccion');}catch(err){notify('No se ha podido guardar: '+err.message);$('#saveitem').disabled=false;}};
+ $('#itemform').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target),item={id:editing||'P'+Date.now(),photo,name:String(fd.get('name')).trim(),category:String(fd.get('category')).trim(),color:String(fd.get('color')).trim(),size:sizeDisplay(fd.get('size')),season:String(fd.get('season')),location:String(fd.get('location')),notes:String(fd.get('notes')).trim()};if(!item.name)return;$('#saveitem').disabled=true;try{if(connected&&item.photo?.startsWith('data:image/'))item.photo=await compressDataUrl(item.photo);await put('items',item);search='';filter='all';sizeFilter='all';view('coleccion');}catch(err){notify('No se ha podido guardar: '+err.message);$('#saveitem').disabled=false;}};
  $('#cancel').onclick=()=>view('coleccion');
  if(editing)$('#delete').onclick=async()=>{if(!confirm('¿Eliminar esta prenda del inventario?'))return;try{await removeItem(editing);view('coleccion');}catch(e){notify('No se ha podido eliminar: '+e.message);}};
  $('#export').onclick=()=>{const blob=new Blob([JSON.stringify(state)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='armario-paula-copia-'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),3000);};
