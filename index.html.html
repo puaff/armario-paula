@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>El armario de Paula</title><style>:root{--bg:#f8f6f2;--ink:#302a27;--muted:#827b74;--line:#e5ded5;--accent:#775a4b}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px system-ui,-apple-system,sans-serif}header{padding:28px 20px 18px;text-align:center;background:#fff}header small{letter-spacing:.3em;color:var(--muted);font-size:10px}h1{font:normal 34px Georgia,serif;margin:8px 0}nav{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:14px;background:white;border-bottom:1px solid var(--line)}button{cursor:pointer;border:1px solid var(--line);background:white;padding:11px 15px;border-radius:7px;color:var(--ink)}button.active,.primary{background:var(--ink);color:white;border-color:var(--ink)}main{max-width:1050px;margin:auto;padding:24px 16px 70px}.intro{font:26px Georgia,serif;margin:0 0 6px}.hint{color:var(--muted);margin:0 0 22px}.tools{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px}input,select,textarea{padding:12px;border:1px solid var(--line);border-radius:6px;background:white;color:var(--ink);font:inherit;max-width:100%}.tools input{flex:2;min-width:170px}.tools select{flex:1;min-width:140px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:20px}.tile{background:white;overflow:hidden;border:1px solid var(--line);border-radius:9px}.photo{height:230px;background:#eee8df;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#a89a8b;font:18px Georgia,serif}.photo img{width:100%;height:100%;object-fit:cover}.info{padding:13px}.info h3{font:19px Georgia,serif;margin:0 0 6px}.info p{font-size:12px;color:var(--muted);margin:0 0 12px}.info button{font-size:12px;padding:8px 10px}.panel{background:white;padding:20px;border:1px solid var(--line);border-radius:9px;margin-bottom:16px}.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}.field label{font-size:12px;color:var(--muted)}.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 18px}.empty{padding:30px;text-align:center;color:var(--muted);background:white;border:1px dashed var(--line);border-radius:9px}.locations{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}.loc{background:white;border:1px solid var(--line);padding:20px;border-radius:9px}.loc h3{font:22px Georgia,serif;margin:0 0 10px}.loc p{color:var(--muted);font-size:13px}footer{max-width:1050px;margin:20px auto;padding:0 16px 30px;color:var(--muted);font-size:12px}#notice{margin:12px 0;color:#745947;font-size:13px} .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}@media(max-width:480px){h1{font-size:29px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.photo{height:190px}.info{padding:10px}.info h3{font-size:16px}nav button{padding:9px 10px;font-size:12px}}
+.account{max-width:1050px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border-bottom:1px solid var(--line);background:#fff}.account p{margin:0;color:var(--muted);font-size:13px}.account .buttons{display:flex;gap:8px;flex-wrap:wrap}.noticebox{background:#fff8e9;border:1px solid #e8d7b5;border-radius:8px;padding:13px 16px;margin:0 0 20px;line-height:1.5}.noticebox p{margin:8px 0}.noticebox code{word-break:break-all}.noticebox pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:#f6f4f1;padding:10px;border-radius:6px}.noticebox button{margin:4px}.muted{font-size:12px;color:var(--muted)}.tiny{font-size:12px}.photo img{display:block}.account button{font-size:13px}button:disabled{opacity:.55;cursor:wait}#message{font-size:13px;color:#775a4b}</style></head>
+<body><header><small>MI COLECCIÓN PERSONAL</small><h1>El armario de Paula</h1><small>UNA PRENDA · UN LUGAR · TODO A MANO</small></header>
+<div class="account"><p id="account-status">🔒 Modo local · Tus prendas siguen en este navegador</p><div class="buttons"><button id="login">Entrar con Google</button><button id="sync" hidden>Conectar sincronización</button><button id="logout" hidden>Salir de Google</button></div></div>
+<nav><button data-tab="coleccion" class="active">Colección</button><button data-tab="bolsas">Bolsas</button><button data-tab="armarios">Armarios</button><button data-tab="anadir">+ Añadir prenda</button></nav>
+<main><div id="message" aria-live="polite"></div><div id="setup"></div><div id="app"></div></main>
+<footer>El armario de Paula · Haz copias de seguridad con regularidad. La sincronización solo estará disponible tras configurar las reglas privadas de Firestore. Las fotografías se comprimen y guardan junto a cada prenda en Firestore (sin Firebase Storage).</footer>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
+import { getFirestore, collection, getDocs, onSnapshot, setDoc, deleteDoc, doc } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
+const firebaseConfig = {
+  apiKey:'AIzaSyDt5AJ8zPDpTS_MnYfAYwb_Ty8WMumEoJk',
+  authDomain:'armario-paula.firebaseapp.com',
+  projectId:'armario-paula',
+  storageBucket:'armario-paula.firebasestorage.app',
+  messagingSenderId:'17136400818',
+  appId:'1:17136400818:web:0e19d4d52145772bca0cab'
+};
+const fb=initializeApp(firebaseConfig),auth=getAuth(fb),db=getFirestore(fb);
+const KEY='armario_paula_v1';
+const defaults=()=>({items:[],locations:[{id:'B001',name:'Bolsa B001',kind:'Bolsa'},{id:'A001',name:'Armario dormitorio',kind:'Armario'},{id:'C001',name:'Cajonera',kind:'Armario'}]});
+let localState;
+try{localState=JSON.parse(localStorage.getItem(KEY));}catch{}
+if(!localState||!Array.isArray(localState.items)||!Array.isArray(localState.locations))localState=defaults();
+let state=localState, user=null, connected=false, tab='coleccion',search='',filter='all',editing=null, listeners=[];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const notify=s=>{$('#message').textContent=s||'';};
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(state));localState=structuredClone(state);return true;}catch(e){notify('No cabe toda la información en la memoria de este navegador. Exporta una copia de seguridad.');return false;}}
+const loc=id=>state.locations.find(x=>x.id===id)?.name||'Sin ubicación';
+const options=(selected)=>state.locations.map(x=>`<option value="${esc(x.id)}" ${x.id===selected?'selected':''}>${esc(x.name)}</option>`).join('');
+function view(t){tab=t;editing=null;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));render();}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>view(b.dataset.tab));
+function userRules(uid){return `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == userId
+        && request.auth.uid == '${uid}';
+    }
+  }
+}`;}
+function setup(hint=''){
+ const e=$('#setup');
+ if(!user){e.innerHTML='';return;}
+ if(connected){e.innerHTML='';return;}
+ e.innerHTML=`<div class="noticebox"><strong>🔐 Último paso para activar tu armario privado</strong><p>Has iniciado sesión con Google. Tu identificador (UID) es:</p><p><code>${esc(user.uid)}</code> <button id="copyuid">Copiar UID</button></p><p>En <strong>Firebase → Firestore → Reglas</strong>, sustituye las reglas por estas y pulsa <strong>Publicar</strong>. Solo tu usuario podrá acceder al inventario.</p><pre>${esc(userRules(user.uid))}</pre><button id="copyrules">Copiar reglas</button><p>Después pulsa <strong>Conectar sincronización</strong> (arriba). ${esc(hint)}</p><p class="muted">Hasta entonces estás en modo local. No cambies las reglas para permitir acceso a cualquier usuario autenticado.</p></div>`;
+ $('#copyuid').onclick=()=>copy(user.uid);
+ $('#copyrules').onclick=()=>copy(userRules(user.uid));
+}
+async function copy(value){try{await navigator.clipboard.writeText(value);notify('Copiado.');}catch{notify('No se pudo copiar automáticamente: selecciona el texto para copiarlo.');}}
+function disconnect(){listeners.forEach(f=>f());listeners=[];connected=false;state=localState;$('#sync').hidden=!user;setup();render();}
+onAuthStateChanged(auth,u=>{
+ if(connected)disconnect();
+ user=u;
+ $('#login').hidden=!!u;$('#logout').hidden=!u;$('#sync').hidden=!u;
+ $('#account-status').textContent=u?'🔐 Google: '+(u.email||'sesión iniciada')+' · pendiente de conectar':'🔒 Modo local · Tus prendas siguen en este navegador';
+ setup();render();
+});
+$('#login').onclick=async()=>{try{notify('Abriendo Google…');await signInWithPopup(auth,new GoogleAuthProvider());notify('Sesión iniciada. Configura las reglas de Firestore que aparecen debajo.');}catch(e){notify('No se ha podido entrar con Google: '+e.message+' Si estás en Safari, permite ventanas emergentes para este sitio y vuelve a intentarlo.');}};
+$('#logout').onclick=async()=>{await signOut(auth);notify('Sesión cerrada. Tus datos locales siguen guardados en este navegador.');};
+const ref=(kind,id)=>doc(db,'users',user.uid,kind,id);
+async function put(kind,obj){if(connected){await setDoc(ref(kind,obj.id),obj);}else{if(kind==='items'){let i=state.items.findIndex(x=>x.id===obj.id);if(i>=0)state.items[i]=obj;else state.items.push(obj);}else state.locations.push(obj);persist();}}
+async function removeItem(id){if(connected)await deleteDoc(ref('items',id));else{state.items=state.items.filter(v=>v.id!==id);persist();}}
+function startListeners(){
+ let remoteItems=null,remoteLocations=null;
+ const publish=()=>{if(remoteItems===null||remoteLocations===null)return;state={items:remoteItems,locations:remoteLocations.length?remoteLocations:defaults().locations};persist();render();};
+ const error=e=>{notify('Sincronización interrumpida: '+e.message);disconnect();};
+ listeners.push(onSnapshot(collection(db,'users',user.uid,'items'),snap=>{remoteItems=snap.docs.map(d=>d.data());publish();},error));
+ listeners.push(onSnapshot(collection(db,'users',user.uid,'locations'),snap=>{remoteLocations=snap.docs.map(d=>d.data());publish();},error));
+ connected=true;$('#sync').hidden=true;$('#account-status').textContent='☁️ Sincronizado · '+(user.email||'Google');setup();notify('Sincronización activada. Los cambios se guardan en tu cuenta de Google.');
+}
+$('#sync').onclick=async()=>{
+ if(!user)return;
+ $('#sync').disabled=true;
+ try{
+  notify('Comprobando las reglas privadas y los datos de la nube…');
+  let [ir,lr]=await Promise.all([getDocs(collection(db,'users',user.uid,'items')),getDocs(collection(db,'users',user.uid,'locations'))]);
+  if(ir.empty&&lr.empty&&(localState.items.length||localState.locations.length)){
+   const msg=localState.items.length?`Hay ${localState.items.length} prendas guardadas en este navegador. ¿Subirlas ahora a tu armario privado en la nube?`:'¿Crear tus ubicaciones en la nube?';
+   if(confirm(msg)){
+    notify('Subiendo inventario local. No cierres la página…');
+    for(const l of localState.locations)await setDoc(ref('locations',l.id),l);
+    for(const i of localState.items){let item={...i};if(item.photo?.startsWith('data:image/'))item.photo=await compressDataUrl(item.photo);await setDoc(ref('items',item.id),item);}
+   }else{notify('No se ha subido nada. Sigues en modo local, sin perder tus prendas.');return;}
+  }else if(!ir.empty&&localState.items.length){
+   notify('Se ha encontrado un inventario en la nube. Se usará el de la nube. Tu copia JSON sigue disponible.');
+  }
+  startListeners();
+ }catch(e){setup('Comprueba que hayas publicado las reglas correctas.');notify('Todavía no se ha conectado: '+e.message+' (Tus prendas locales no se han borrado).');}
+ finally{$('#sync').disabled=false;}
+};
+function render(){
+ let a=$('#app');
+ if(tab==='coleccion'){
+ let items=state.items.filter(x=>(filter==='all'||x.location===filter)&&(`${x.name} ${x.category} ${x.color} ${x.season} ${loc(x.location)}`).toLowerCase().includes(search.toLowerCase()));
+ a.innerHTML=`<h2 class="intro">Mi colección</h2><p class="hint">${state.items.length} prendas registradas · Tu boutique personal ${connected?'☁️':'· Modo local'}</p><div class="tools"><input id="search" placeholder="Buscar prenda, color, temporada…" value="${esc(search)}"><select id="filter"><option value="all">Todas las ubicaciones</option>${options(filter)}</select></div><div class="grid">${items.map(x=>`<article class="tile"><div class="photo">${x.photo?`<img src="${esc(x.photo)}" alt="${esc(x.name)}">`:'Sin fotografía'}</div><div class="info"><h3>${esc(x.name)}</h3><p>${esc(x.category)} · ${esc(loc(x.location))}</p><button data-edit="${esc(x.id)}">Ver / mover</button></div></article>`).join('')}</div>${!items.length?'<div class="empty">Todavía no hay prendas que mostrar. Añade la primera fotografía para comenzar.</div>':''}`;
+ $('#search').oninput=e=>{search=e.target.value;const p=e.target.selectionStart;render();$('#search').focus();$('#search').setSelectionRange(p,p);};
+ $('#filter').value=filter;$('#filter').onchange=e=>{filter=e.target.value;render();};
+ document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{editing=b.dataset.edit;tab='anadir';document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab==='anadir'));render();});
+ }else if(tab==='bolsas'||tab==='armarios'){
+ const kind=tab==='bolsas'?'Bolsa':'Armario',ls=state.locations.filter(x=>x.kind===kind);
+ a.innerHTML=`<h2 class="intro">Mis ${tab}</h2><p class="hint">Organiza las ubicaciones y consulta cuántas prendas guardas en cada una.</p><div class="locations">${ls.map(x=>`<div class="loc"><h3>${esc(x.name)}</h3><p>${state.items.filter(i=>i.location===x.id).length} prendas</p><button data-open="${esc(x.id)}">Ver prendas</button></div>`).join('')}</div><div class="panel" style="margin-top:24px"><h3>Añadir ubicación</h3><div class="tools"><input id="newloc" placeholder="Ej. Bolsa B002 o Armario pasillo"><button id="addloc" class="primary">Crear</button></div></div>`;
+ $('#addloc').onclick=async()=>{const name=$('#newloc').value.trim();if(!name)return;$('#addloc').disabled=true;try{await put('locations',{id:'L'+Date.now(),name,kind});render();}catch(e){notify('Error al guardar ubicación: '+e.message);$('#addloc').disabled=false;}};
+ document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{filter=b.dataset.open;search='';view('coleccion');});
+ }else{
+ const x=state.items.find(i=>i.id===editing)||{name:'',category:'',color:'',season:'Todo el año',location:state.locations[0]?.id||'',notes:'',photo:''};
+ a.innerHTML=`<h2 class="intro">${editing?'Ficha de la prenda':'Nueva prenda'}</h2><p class="hint">Una fotografía por prenda, para encontrarla siempre.</p><form class="panel" id="itemform"><div class="field"><label>Fotografía</label><div class="actions"><button type="button" id="takephoto">📷 Hacer foto</button><button type="button" id="choosephoto">Elegir de la galería</button></div><input type="file" id="cameraInput" accept="image/*" capture="environment" hidden><input type="file" id="photo" accept="image/*" hidden><div id="preview" style="max-width:180px">${x.photo?`<img src="${esc(x.photo)}" style="width:100%;border-radius:8px">`:''}</div></div><div class="formgrid"><div class="field"><label>Nombre de la prenda *</label><input name="name" required value="${esc(x.name)}" placeholder="Ej. Jersey beige"></div><div class="field"><label>Tipo</label><input name="category" value="${esc(x.category)}" placeholder="Jersey, vestido, pantalón…"></div><div class="field"><label>Color</label><input name="color" value="${esc(x.color)}"></div><div class="field"><label>Temporada</label><select name="season">${['Todo el año','Invierno','Verano','Entretiempo'].map(v=>`<option ${x.season===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="field"><label>Ubicación actual</label><select name="location">${options(x.location)}</select></div></div><div class="field"><label>Notas</label><textarea name="notes" rows="3">${esc(x.notes)}</textarea></div><div class="actions"><button class="primary" type="submit" id="saveitem">Guardar prenda</button>${editing?'<button type="button" id="delete">Eliminar prenda</button>':''}<button type="button" id="cancel">Volver a colección</button></div><div id="notice"></div></form><div class="panel"><strong>Copias de seguridad</strong><p class="hint" style="margin:8px 0">Exporta o importa el inventario completo, incluidas las fotografías.</p><div class="actions"><button id="export">Exportar JSON</button><button id="import">Importar JSON</button><input id="importfile" type="file" accept="application/json" hidden></div></div>`;
+ let photo=x.photo;
+ $('#takephoto').onclick=()=>$('#cameraInput').click();$('#choosephoto').onclick=()=>$('#photo').click();
+ const handlePhoto=async e=>{const f=e.target.files[0];if(!f)return;try{photo=await shrink(f);$('#preview').innerHTML=`<img src="${photo}" style="width:100%;border-radius:8px">`;}catch(err){notify('No se pudo leer la fotografía. Prueba con una imagen JPEG o PNG.');}};
+ $('#photo').onchange=handlePhoto;$('#cameraInput').onchange=handlePhoto;
+ $('#itemform').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target),item={id:editing||'P'+Date.now(),photo,name:String(fd.get('name')).trim(),category:String(fd.get('category')).trim(),color:String(fd.get('color')).trim(),season:String(fd.get('season')),location:String(fd.get('location')),notes:String(fd.get('notes')).trim()};if(!item.name)return;$('#saveitem').disabled=true;try{if(connected&&item.photo?.startsWith('data:image/'))item.photo=await compressDataUrl(item.photo);await put('items',item);search='';filter='all';view('coleccion');}catch(err){notify('No se ha podido guardar: '+err.message);$('#saveitem').disabled=false;}};
+ $('#cancel').onclick=()=>view('coleccion');
+ if(editing)$('#delete').onclick=async()=>{if(!confirm('¿Eliminar esta prenda del inventario?'))return;try{await removeItem(editing);view('coleccion');}catch(e){notify('No se ha podido eliminar: '+e.message);}};
+ $('#export').onclick=()=>{const blob=new Blob([JSON.stringify(state)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='armario-paula-copia-'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),3000);};
+ $('#import').onclick=()=>$('#importfile').click();
+ $('#importfile').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;const v=JSON.parse(await f.text());if(!Array.isArray(v.items)||!Array.isArray(v.locations))throw Error('Formato no válido');if(!confirm('Esto sustituirá el inventario actual '+(connected?'en la nube':'en este navegador')+'. ¿Continuar?'))return;if(connected){notify('Importando… No cierres la página.');for(const old of state.items)if(!v.items.some(i=>i.id===old.id))await deleteDoc(ref('items',old.id));for(const old of state.locations)if(!v.locations.some(i=>i.id===old.id))await deleteDoc(ref('locations',old.id));for(const l of v.locations)await setDoc(ref('locations',l.id),l);for(const i of v.items){const item={...i};if(item.photo?.startsWith('data:image/'))item.photo=await compressDataUrl(item.photo);await setDoc(ref('items',item.id),item);}}else{state=v;persist();}view('coleccion');notify('Importación completada.');}catch(err){notify('No se pudo importar: '+err.message);}};
+ }
+}
+function imageLoad(src){return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(new Error('Imagen no válida'));im.src=src;});}
+async function compressDataUrl(data){const im=await imageLoad(data);return encodeImage(im);}
+async function shrink(file){const url=URL.createObjectURL(file);try{const im=await imageLoad(url);return encodeImage(im);}finally{URL.revokeObjectURL(url);}}
+function encodeImage(im){let max=720,q=.72,output='';for(let step=0;step<7;step++){const scale=Math.min(1,max/Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round((im.naturalWidth||im.width)*scale));canvas.height=Math.max(1,Math.round((im.naturalHeight||im.height)*scale));canvas.getContext('2d').drawImage(im,0,0,canvas.width,canvas.height);output=canvas.toDataURL('image/jpeg',q);if(output.length<340000)return output;if(q>.42)q-=.1;else max=Math.floor(max*.8);}if(output.length>=900000)throw Error('Foto demasiado grande. Intenta otra fotografía.');return output;}
+render();
+</script></body></html>
